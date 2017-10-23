@@ -1,9 +1,8 @@
 # AsRequests: Asyncio + Requests.
-===============================
+
 AsRequests allow you to use Requests with asyncio to make asynchronous HTTP Requests easily.
 
 # Usage:
-=======
 
 Usage is simple:
 
