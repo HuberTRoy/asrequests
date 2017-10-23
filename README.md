@@ -1,10 +1,12 @@
-AsRequests: Asyncio + Requests.
-
+# AsRequests: Asyncio + Requests.
+===============================
 AsRequests allow you to use Requests with asyncio to make asynchronous HTTP Requests easily.
 
-Usage:
-<hr>
+# Usage:
+=======
+
 Usage is simple:
+
 ```
 from  asrequests import AsRequests
 
@@ -16,6 +18,7 @@ urls = [
 ```
 
 Send them all the same time.
+
 ```
 >>> with AsRequests() as ar:
             for i in urls:
@@ -43,5 +46,5 @@ This url 'https://www.python.org/' is connectable.
 ```
 
 Installation.
-<hr>
+============
 Download.
