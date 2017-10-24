@@ -30,8 +30,7 @@ Send them all the same time.
 Use callback.
 
 ```
->>> def my_callback(response):
-            result = response.result()
+>>> def my_callback(result):
             if result:
                 print("This url '{url}' is connectable.".format(result.url))
 
