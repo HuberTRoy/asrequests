@@ -13,6 +13,10 @@ import asyncio
 
 import requests
 
+import aiohttp
+
+# from concurrent.futures import ThreadPoolExecutor
+# import threading
 
 __all__ = (
     'AsRequests'
@@ -20,14 +24,18 @@ __all__ = (
 
 
 class RequestsBase(object):
+    session = requests.session()
+
+    def __del__(self):
+        self.session.close()
 
     def get(self, url, **kwargs):
 
-        return requests.get(url, **kwargs)
+        return self.session.get(url, **kwargs)
 
     def post(self, url, **kwargs):
 
-        return requests.post(url, **kwargs)
+        return self.session.post(url, **kwargs)
 
 
 class AsRequests(RequestsBase):
@@ -62,8 +70,7 @@ class AsRequests(RequestsBase):
     print(ar.result)
 
     # with params.
-    def showResponse(future):
-        result = future.result()
+    def showResponse(result):
         print(result)
         ....
 
@@ -92,7 +99,7 @@ class AsRequests(RequestsBase):
         
         self.tasks = []
         
-        self.callback = callback if callback else lambda response: self.result.append(response.result())
+        self.callback = callback if callback else lambda response: self.result.append(response)
 
         self.exceptionHandler = exceptionHandler if exceptionHandler else lambda exception: print(exception)
 
@@ -113,6 +120,9 @@ class AsRequests(RequestsBase):
 
         return True
 
+    def __del__(self):
+        pass
+
     def _httpRequest(self, method, url, kwargs):
         method = method.upper()
         if method == 'GET':
@@ -129,8 +139,11 @@ class AsRequests(RequestsBase):
 
         try:
             data = yield from future
+            eventLoop.call_soon_threadsafe(self.callback, data)
+
         except Exception as e:
             self.exceptionHandler(e)
+            eventLoop.call_soon_threadsafe(self.callback, False)
             return False
 
         return data
@@ -142,8 +155,10 @@ class AsRequests(RequestsBase):
 
         try:
             data = yield from future
+            eventLoop.call_soon_threadsafe(self.callback, data)
         except Exception as e:
             self.exceptionHandler(e)
+            eventLoop.call_soon_threadsafe(self.callback, False)
             return False
 
         return data
@@ -158,23 +173,15 @@ class AsRequests(RequestsBase):
         """
         check out 'http://docs.python-requests.org/en/master/' getting help.
         """
-        eventLoop = asyncio.get_event_loop()
-        future = eventLoop.create_task(self._get(url, **kwargs))
-        future.add_done_callback(self.callback)
-        
-        self.tasks.append(future)
+        self.tasks.append(self._get(url, **kwargs))
 
     def post(self, url, **kwargs):
         """
         check out 'http://docs.python-requests.org/en/master/' getting help.
         """
-        eventLoop = asyncio.get_event_loop()
-        future = eventLoop.create_task(self._post(url, **kwargs))
-        future.add_done_callback(self.callback)
-
-        self.tasks.append(future)
+        self.tasks.append(self._post(url, **kwargs))
 
 
 if __name__ == '__main__':
-    
     help(AsRequests)
+
