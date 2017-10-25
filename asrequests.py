@@ -173,15 +173,16 @@ class AsRequests(RequestsBase):
         """
         check out 'http://docs.python-requests.org/en/master/' getting help.
         """
-        self.tasks.append(self._get(url, **kwargs))
+        self.tasks.append(asyncio.ensure_future(self._get(url, **kwargs)))
 
     def post(self, url, **kwargs):
         """
         check out 'http://docs.python-requests.org/en/master/' getting help.
         """
-        self.tasks.append(self._post(url, **kwargs))
+        self.tasks.append(asyncio.ensure_future(self._post(url, **kwargs)))
 
 
 if __name__ == '__main__':
+
     help(AsRequests)
 
