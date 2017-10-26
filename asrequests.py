@@ -13,10 +13,6 @@ import asyncio
 
 import requests
 
-import aiohttp
-
-# from concurrent.futures import ThreadPoolExecutor
-# import threading
 
 __all__ = (
     'AsRequests'
@@ -45,14 +41,18 @@ class AsRequests(RequestsBase):
     Accept parameters:
 
     :param callback: response callback. 
-    :param callback default: lambda response: self.result.append(response.result()) 
+    :param callback default: lambda response: self.result.append(response)
 
     :param exceptionHandler: exception handling function. 
     :param exceptionHandler default: lambda exception: print(exception)
     
     Method:
-    get.
-    post.
+    get
+    post
+
+    Coroutine Method:
+    aget
+    apost
 
     Usage::
     # normal.
@@ -90,6 +90,45 @@ class AsRequests(RequestsBase):
     <Response [200]>
     <Response [200]>
     <Response [200]>
+
+    Coroutine Usage::
+    import asyncio
+    urls = ['https://github.com']*5
+    
+    arequests = AsRequests()
+    
+    # one.
+    @asyncio.coroutine
+    def getUrl(url, **kwargs):
+        print('url: {0}'.format(url))
+        result = yield from arequests.aget(url, **kwargs)
+        print('url: {0}, response: {1}'.format(url, result))
+
+    eventLoop = asyncio.get_event_loop()
+    # run.
+    eventLoop.run_until_complete(asyncio.wait([getUrl(url) for url in urls]))
+    
+    # two.
+    @asyncio.coroutine
+    def getUrl(url, **kwargs):
+        print('url: {0}'.format(url))
+        result = yield from arequests.aget(url, **kwargs)
+        print('url: {0}, response: {1}'.format(url, result))
+    
+    for url in urls:
+        # asyncio.ensure_future or eventLoop.create_task or asyncio.Task.
+        asyncio.Task(getUrl(url))
+
+    eventLoop = asyncio.get_event_loop()
+    # run.
+    eventLoop.run_forever()
+    >>>
+    url: https://github.com
+    url: https://github.com
+    ....
+    url: https://github.com, response: <Response [200]>
+    url: https://github.com, response: <Response [200]>
+    ....
     """
     def __init__(self, callback=None, exceptionHandler=None):
         super().__init__()
@@ -121,7 +160,7 @@ class AsRequests(RequestsBase):
         return True
 
     def __del__(self):
-        pass
+        self.session.close()
 
     def _httpRequest(self, method, url, kwargs):
         method = method.upper()
@@ -181,8 +220,24 @@ class AsRequests(RequestsBase):
         """
         self.tasks.append(asyncio.ensure_future(self._post(url, **kwargs)))
 
+    @asyncio.coroutine
+    def aget(self, url, **kwargs):
+        eventLoop = asyncio.get_event_loop()
+        future = eventLoop.run_in_executor(None, self._httpRequest, 'GET', url, kwargs)
+
+        return future
+
+    @asyncio.coroutine
+    def apost(self, url, **kwargs):
+        eventLoop = asyncio.get_event_loop()
+        future = eventLoop.run_in_executor(None, self._httpRequest, 'POST', url, kwargs)
+
+        return future
+
 
 if __name__ == '__main__':
 
     help(AsRequests)
+    
+
 
