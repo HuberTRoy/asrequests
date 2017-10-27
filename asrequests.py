@@ -46,100 +46,118 @@ class AsRequests(RequestsBase):
     :param exceptionHandler: exception handling function. 
     :param exceptionHandler default: lambda exception: print(exception)
     
+    :param callbackMode: The type of callback function.
+    :param callbackMode accept:
+        1(or != 2,3) : callback function is a normal function.
+        2 : callback function has blocking codes.
+        3 : callback function is an asynchronous function.
+
     Method:
-    get
-    post
+        get
+        post
 
     Coroutine Method:
-    aget
-    apost
+        aget
+        apost
 
     Usage::
-    # normal.
-    with AsRequests() as ar:
-        for i in ['https://github.com']*5:
-            ar.get(i)
+        # normal.
+        with AsRequests() as ar:
+            for i in ['https://github.com']*5:
+                ar.get(i)
 
-    print(ar.result)
-    
-    # print error.
-    with ar:
-        for i in ['https://github.com']*5:
-            ar.get(i, timeout=0.001)   
+        print(ar.result)
+        
+        # print error.
+        with ar:
+            for i in ['https://github.com']*5:
+                ar.get(i, timeout=0.001)   
 
-    print(ar.result)
+        print(ar.result)
 
-    # with params.
-    def showResponse(result):
-        print(result)
-        ....
+        # with params.
+        def showResponse(result):
+            print(result)
+            ....
 
-    with AsRequests(callback=showResponse) as ar:
-        for i in ['https://github.com']*5:
-            ar.get(i)
+        with AsRequests(callback=showResponse) as ar:
+            for i in ['https://github.com']*5:
+                ar.get(i)
 
-    >>>
-    # normal.
-    [<Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>]
-    # error
-    error information...
-    [False, False, False, False, False]
-    # print result.
-    <Response [200]>
-    <Response [200]>
-    <Response [200]>
-    <Response [200]>
-    <Response [200]>
+        >>>
+        # normal.
+        [<Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>]
+        # error
+        error information...
+        [False, False, False, False, False]
+        # print result.
+        <Response [200]>
+        <Response [200]>
+        <Response [200]>
+        <Response [200]>
+        <Response [200]>
 
     Coroutine Usage::
-    import asyncio
-    urls = ['https://github.com']*5
-    
-    arequests = AsRequests()
-    
-    # one.
-    @asyncio.coroutine
-    def getUrl(url, **kwargs):
-        print('url: {0}'.format(url))
-        result = yield from arequests.aget(url, **kwargs)
-        print('url: {0}, response: {1}'.format(url, result))
+        import asyncio
+        urls = ['https://github.com']*5
+        
+        arequests = AsRequests()
+        
+        # one.
+        @asyncio.coroutine
+        def getUrl(url, **kwargs):
+            print('url: {0}'.format(url))
+            result = yield from arequests.aget(url, **kwargs)
+            print('url: {0}, response: {1}'.format(url, result))
 
-    eventLoop = asyncio.get_event_loop()
-    # run.
-    eventLoop.run_until_complete(asyncio.wait([getUrl(url) for url in urls]))
-    
-    # two.
-    @asyncio.coroutine
-    def getUrl(url, **kwargs):
-        print('url: {0}'.format(url))
-        result = yield from arequests.aget(url, **kwargs)
-        print('url: {0}, response: {1}'.format(url, result))
-    
-    for url in urls:
-        # asyncio.ensure_future or eventLoop.create_task or asyncio.Task.
-        asyncio.Task(getUrl(url))
+        eventLoop = asyncio.get_event_loop()
+        # run.
+        eventLoop.run_until_complete(asyncio.wait([getUrl(url) for url in urls]))
+        
+        # two.
+        @asyncio.coroutine
+        def getUrl(url, **kwargs):
+            print('url: {0}'.format(url))
+            result = yield from arequests.aget(url, **kwargs)
+            print('url: {0}, response: {1}'.format(url, result))
+        
+        for url in urls:
+            # asyncio.ensure_future or eventLoop.create_task or asyncio.Task.
+            asyncio.Task(getUrl(url))
 
-    eventLoop = asyncio.get_event_loop()
-    # run.
-    eventLoop.run_forever()
-    >>>
-    url: https://github.com
-    url: https://github.com
-    ....
-    url: https://github.com, response: <Response [200]>
-    url: https://github.com, response: <Response [200]>
-    ....
+        eventLoop = asyncio.get_event_loop()
+        # run.
+        eventLoop.run_forever()
+        >>>
+        url: https://github.com
+        url: https://github.com
+        ....
+        url: https://github.com, response: <Response [200]>
+        url: https://github.com, response: <Response [200]>
+        ....
     """
-    def __init__(self, callback=None, exceptionHandler=None):
+    def __init__(self, callback=None, exceptionHandler=None, callbackMode=1):
         super().__init__()
         
+        self.callbackMode = callbackMode
+
         # default callback result.
-        self.result = []
-        
         self.tasks = []
-        
+        self.result = []
+
         self.callback = callback if callback else lambda response: self.result.append(response)
 
+        # if callback function has blocking codes.
+        self.blockingCallbackTasks = []
+
+        self.blockingCallback = lambda response: self.result.append(response)
+
+        # if callback function has asynchronous codes.
+        self.asyncCallbackTasks = []
+        
+        self.asyncCallback = lambda response: self.asyncCallbackTasks.append(self.callback(response))
+        
+        # default exception handling function.
         self.exceptionHandler = exceptionHandler if exceptionHandler else lambda exception: print(exception)
 
     def __enter__(self):
@@ -147,7 +165,13 @@ class AsRequests(RequestsBase):
         # Initialize the tasks and result.
         self.tasks = []
         self.result = []
-        
+
+        # if callback function has blocking codes.
+        self.blockingCallbackTasks = []
+
+        # if callback function has asynchronous codes.
+        self.asyncCallbackTasks = []
+
         return self
 
     def __exit__(self, except_type, value, tb):
@@ -157,6 +181,17 @@ class AsRequests(RequestsBase):
         eventLoop = asyncio.get_event_loop()
         eventLoop.run_until_complete(asyncio.wait(self.tasks))
 
+        newLoop = asyncio.new_event_loop()
+        asyncio.set_event_loop(newLoop)
+
+        if self.callbackMode == 3:
+            newLoop.run_until_complete(asyncio.wait([asyncio.Task(_) for _ in self.asyncCallbackTasks]))
+        elif self.callbackMode == 2:
+            for i in self.result:
+                future = newLoop.run_in_executor(None, self.callback, i)
+                self.blockingCallbackTasks.append(asyncio.ensure_future(future))
+
+            newLoop.run_until_complete(asyncio.wait(self.blockingCallbackTasks))
         return True
 
     def __del__(self):
@@ -178,14 +213,18 @@ class AsRequests(RequestsBase):
 
         try:
             data = yield from future
-            eventLoop.call_soon_threadsafe(self.callback, data)
-
         except Exception as e:
+            data = False
             self.exceptionHandler(e)
-            eventLoop.call_soon_threadsafe(self.callback, False)
-            return False
-
-        return data
+        finally:
+            if self.callbackMode == 3:
+                eventLoop.call_soon_threadsafe(self.asyncCallback, data)
+            elif self.callbackMode == 2:
+                eventLoop.call_soon_threadsafe(self.blockingCallback, data)
+            else:
+                eventLoop.call_soon_threadsafe(self.callback, data)
+            
+            return data
 
     @asyncio.coroutine
     def _post(self, url, **kwargs):
@@ -194,13 +233,18 @@ class AsRequests(RequestsBase):
 
         try:
             data = yield from future
-            eventLoop.call_soon_threadsafe(self.callback, data)
         except Exception as e:
+            data = False
             self.exceptionHandler(e)
-            eventLoop.call_soon_threadsafe(self.callback, False)
-            return False
-
-        return data
+        finally:
+            if self.callbackMode == 3:
+                eventLoop.call_soon_threadsafe(self.asyncCallback, data)
+            elif self.callbackMode == 2:
+                eventLoop.call_soon_threadsafe(self.blockingCallback, data)
+            else:
+                eventLoop.call_soon_threadsafe(self.callback, data)
+            
+            return data
 
     def setCallback(self, func):
         self.callback = func
@@ -238,6 +282,5 @@ class AsRequests(RequestsBase):
 if __name__ == '__main__':
 
     help(AsRequests)
-    
 
 
