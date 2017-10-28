@@ -183,7 +183,6 @@ class AsRequests(RequestsBase):
 
         newLoop = asyncio.new_event_loop()
         asyncio.set_event_loop(newLoop)
-
         if self.callbackMode == 3:
             newLoop.run_until_complete(asyncio.wait([asyncio.Task(_) for _ in self.asyncCallbackTasks]))
         elif self.callbackMode == 2:
@@ -207,9 +206,9 @@ class AsRequests(RequestsBase):
         return data
 
     @asyncio.coroutine
-    def _get(self, url, **kwargs):
+    def _aHttpRequest(self, method, url, kwargs):
         eventLoop = asyncio.get_event_loop()
-        future = eventLoop.run_in_executor(None, self._httpRequest, 'GET', url, kwargs)
+        future = eventLoop.run_in_executor(None, self._httpRequest, method, url, kwargs)
 
         try:
             data = yield from future
@@ -224,27 +223,15 @@ class AsRequests(RequestsBase):
             else:
                 eventLoop.call_soon_threadsafe(self.callback, data)
             
-            return data
+            return data       
+
+    @asyncio.coroutine
+    def _get(self, url, **kwargs):
+        return self._aHttpRequest('GET', url, kwargs)
 
     @asyncio.coroutine
     def _post(self, url, **kwargs):
-        eventLoop = asyncio.get_event_loop()
-        future = eventLoop.run_in_executor(None, self._httpRequest, 'POST', url, kwargs)
-
-        try:
-            data = yield from future
-        except Exception as e:
-            data = False
-            self.exceptionHandler(e)
-        finally:
-            if self.callbackMode == 3:
-                eventLoop.call_soon_threadsafe(self.asyncCallback, data)
-            elif self.callbackMode == 2:
-                eventLoop.call_soon_threadsafe(self.blockingCallback, data)
-            else:
-                eventLoop.call_soon_threadsafe(self.callback, data)
-            
-            return data
+        return self._aHttpRequest('POST', url, kwargs)
 
     def setCallback(self, func):
         self.callback = func
@@ -282,5 +269,4 @@ class AsRequests(RequestsBase):
 if __name__ == '__main__':
 
     help(AsRequests)
-
-
+    
