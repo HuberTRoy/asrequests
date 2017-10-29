@@ -52,13 +52,9 @@ class AsRequests(RequestsBase):
         2 : callback function has blocking codes.
         3 : callback function is an asynchronous function.
 
-    Method:
+    Method and Coroutine Method:
         get
         post
-
-    Coroutine Method:
-        aget
-        apost
 
     Usage::
         # normal.
@@ -107,7 +103,7 @@ class AsRequests(RequestsBase):
         @asyncio.coroutine
         def getUrl(url, **kwargs):
             print('url: {0}'.format(url))
-            result = yield from arequests.aget(url, **kwargs)
+            result = yield from arequests.get(url, **kwargs)
             print('url: {0}, response: {1}'.format(url, result))
 
         eventLoop = asyncio.get_event_loop()
@@ -118,7 +114,7 @@ class AsRequests(RequestsBase):
         @asyncio.coroutine
         def getUrl(url, **kwargs):
             print('url: {0}'.format(url))
-            result = yield from arequests.aget(url, **kwargs)
+            result = yield from arequests.get(url, **kwargs)
             print('url: {0}, response: {1}'.format(url, result))
         
         for url in urls:
@@ -178,19 +174,8 @@ class AsRequests(RequestsBase):
         """
             without manual setting.
         """
-        eventLoop = asyncio.get_event_loop()
-        eventLoop.run_until_complete(asyncio.wait(self.tasks))
+        self._executeTasks()
 
-        newLoop = asyncio.new_event_loop()
-        asyncio.set_event_loop(newLoop)
-        if self.callbackMode == 3:
-            newLoop.run_until_complete(asyncio.wait([asyncio.Task(_) for _ in self.asyncCallbackTasks]))
-        elif self.callbackMode == 2:
-            for i in self.result:
-                future = newLoop.run_in_executor(None, self.callback, i)
-                self.blockingCallbackTasks.append(asyncio.ensure_future(future))
-
-            newLoop.run_until_complete(asyncio.wait(self.blockingCallbackTasks))
         return True
 
     def __del__(self):
@@ -222,8 +207,7 @@ class AsRequests(RequestsBase):
                 eventLoop.call_soon_threadsafe(self.blockingCallback, data)
             else:
                 eventLoop.call_soon_threadsafe(self.callback, data)
-            
-            return data       
+        return data       
 
     @asyncio.coroutine
     def _get(self, url, **kwargs):
@@ -232,6 +216,21 @@ class AsRequests(RequestsBase):
     @asyncio.coroutine
     def _post(self, url, **kwargs):
         return self._aHttpRequest('POST', url, kwargs)
+
+    def _executeTasks(self):
+        eventLoop = asyncio.get_event_loop()
+        eventLoop.run_until_complete(asyncio.wait(self.tasks))
+
+        newLoop = asyncio.new_event_loop()
+        asyncio.set_event_loop(newLoop)
+        if self.callbackMode == 3:
+            newLoop.run_until_complete(asyncio.wait([asyncio.Task(_) for _ in self.asyncCallbackTasks]))
+        elif self.callbackMode == 2:
+            for i in self.result:
+                future = newLoop.run_in_executor(None, self.callback, i)
+                self.blockingCallbackTasks.append(asyncio.ensure_future(future))
+
+            newLoop.run_until_complete(asyncio.wait(self.blockingCallbackTasks))
 
     def setCallback(self, func):
         self.callback = func
@@ -243,30 +242,23 @@ class AsRequests(RequestsBase):
         """
         check out 'http://docs.python-requests.org/en/master/' getting help.
         """
-        self.tasks.append(asyncio.ensure_future(self._get(url, **kwargs)))
+        future = asyncio.ensure_future(self._get(url, **kwargs))
+        self.tasks.append(future)
+
+        return future
 
     def post(self, url, **kwargs):
         """
         check out 'http://docs.python-requests.org/en/master/' getting help.
         """
-        self.tasks.append(asyncio.ensure_future(self._post(url, **kwargs)))
-
-    @asyncio.coroutine
-    def aget(self, url, **kwargs):
-        eventLoop = asyncio.get_event_loop()
-        future = eventLoop.run_in_executor(None, self._httpRequest, 'GET', url, kwargs)
+        future = asyncio.ensure_future(self._post(url, **kwargs))
+        self.tasks.append(future)
 
         return future
 
-    @asyncio.coroutine
-    def apost(self, url, **kwargs):
-        eventLoop = asyncio.get_event_loop()
-        future = eventLoop.run_in_executor(None, self._httpRequest, 'POST', url, kwargs)
 
-        return future
+asrequests = AsRequests()
 
 
 if __name__ == '__main__':
-
-    help(AsRequests)
-    
+    help(asrequests)
