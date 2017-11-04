@@ -13,10 +13,19 @@ import asyncio
 
 import requests
 
+from collections import namedtuple
+
 
 __all__ = (
     'AsRequests'
 )
+
+ErrorRequest = namedtuple('ErrorRequest', 
+                                                        ['url',
+                                                        'text',
+                                                        'content',
+                                                        'code',
+                                                        'error_info'])
 
 
 class RequestsBase(object):
@@ -32,6 +41,9 @@ class RequestsBase(object):
     def post(self, url, **kwargs):
 
         return self.session.post(url, **kwargs)
+
+    def __del__(self):
+        self.session.close()
 
 
 class AsRequests(RequestsBase):
@@ -85,7 +97,7 @@ class AsRequests(RequestsBase):
         [<Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>]
         # error
         error information...
-        [False, False, False, False, False]
+        [ErrorRequest(url='..', text='', ..), ErrorRequest(url='..', text='', ..), ...]
         # print result.
         <Response [200]>
         <Response [200]>
@@ -172,14 +184,19 @@ class AsRequests(RequestsBase):
 
     def __exit__(self, except_type, value, tb):
         """
-            without manual setting.
+            Without manual setting.
         """
         self._executeTasks()
 
         return True
 
-    def __del__(self):
-        self.session.close()
+    def __repr__(self):
+        """
+            Return the session string and the tasks string.
+        """
+
+        return 'session: {session}\ntasks: {tasks}'.format(session=self.session,
+                                                                                                                       tasks=self.tasks)
 
     def _httpRequest(self, method, url, kwargs):
         method = method.upper()
@@ -198,7 +215,11 @@ class AsRequests(RequestsBase):
         try:
             data = yield from future
         except Exception as e:
-            data = False
+            data = ErrorRequest(url=url,
+                                                      text='',
+                                                      content=b'',
+                                                      code='404',
+                                                      error_info=e)
             self.exceptionHandler(e)
         finally:
             if self.callbackMode == 3:
@@ -261,4 +282,8 @@ asrequests = AsRequests()
 
 
 if __name__ == '__main__':
-    help(asrequests)
+    # help(asrequests)
+    with asrequests:
+        asrequests.get('xxxxx')
+
+    print(asrequests.result)
