@@ -195,8 +195,7 @@ class AsRequests(RequestsBase):
             Return the session string and the tasks string.
         """
 
-        return 'session: {session}\ntasks: {tasks}'.format(session=self.session,
-                                                                                                                       tasks=self.tasks)
+        return '<AsRequests: tasks: {tasks}>'.format(tasks=self.tasks)
 
     def _httpRequest(self, method, url, kwargs):
         method = method.upper()
@@ -210,6 +209,10 @@ class AsRequests(RequestsBase):
     @asyncio.coroutine
     def _aHttpRequest(self, method, url, kwargs):
         eventLoop = asyncio.get_event_loop()
+        # it is still a thread. check out 'asyncio.base_event' getting more details.
+        # check out this:
+        # https://stackoverflow.com/questions/22190403/how-could-i-use-requests-in-asyncio
+        # getting more explain.
         future = eventLoop.run_in_executor(None, self._httpRequest, method, url, kwargs)
 
         try:
@@ -282,8 +285,4 @@ asrequests = AsRequests()
 
 
 if __name__ == '__main__':
-    # help(asrequests)
-    with asrequests:
-        asrequests.get('xxxxx')
-
-    print(asrequests.result)
+    help(asrequests)
