@@ -352,7 +352,7 @@ class AsRequests(BaseHttp):
                 self.blockingCallbackTasks.append(asyncio.ensure_future(future))
 
             newLoop.run_until_complete(asyncio.wait(self.blockingCallbackTasks))
-            
+
         asyncio.set_event_loop(eventLoop)
 
     def setCallback(self, func):
@@ -384,15 +384,5 @@ asrequests = AsRequests()
 
 
 if __name__ == '__main__':
-    # help(asrequests)
-    with asrequests:
-        for i in ['http://www.baidu.com', 'https://github.com']:
-            asrequests.get(i)
+    help(asrequests)
 
-    print(asrequests.result)
-    del asrequests
-    with AsRequests() as e:
-        for i in ['http://www.baidu.com', 'https://github.com']:
-            e.get(i)
-
-    print(e.result)
