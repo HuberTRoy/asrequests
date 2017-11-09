@@ -9,9 +9,24 @@ Simple and effective.
 :)
 
 """
+import json
 import asyncio
 
-import requests
+try:
+    import requests
+    noRequests = False
+except ImportError:
+    noRequests = True
+
+try:
+    import aiohttp
+    import async_timeout
+    noAiohttp = False
+except ImportError:
+    if noRequests:
+        print('aiohttp and requests cannot be found.')
+    else:
+        noAiohttp = True
 
 from collections import namedtuple
 
@@ -21,11 +36,39 @@ __all__ = (
 )
 
 ErrorRequest = namedtuple('ErrorRequest', 
-                                                        ['url',
-                                                        'text',
-                                                        'content',
-                                                        'code',
-                                                        'error_info'])
+                          ['url',
+                          'text',
+                          'content',
+                          'code',
+                          'error_info'])
+
+
+
+class AioResult(object):
+    
+    def __init__(self, content, headers, cookies, encoding='utf-8'):
+
+        self.content = content
+        self.header = headers
+        self.cookies = cookies
+        self.encoding = encoding
+
+        self.text = self.returnText
+        self.json = self.returnJson
+
+    def returnText(self):
+
+        try:
+            return self.content.decode(encoding)
+        except:
+            return self.content.decode()
+
+    def returnJson(self):
+
+        try:
+            return json.loads(self.text)
+        except:
+            return 'This contents are not json data.'
 
 
 class RequestsBase(object):
@@ -42,11 +85,61 @@ class RequestsBase(object):
 
         return self.session.post(url, **kwargs)
 
-    def __del__(self):
-        self.session.close()
+
+BaseHttp = RequestsBase
 
 
-class AsRequests(RequestsBase):
+if not noAiohttp:
+
+    class AioRequestsBase(object):
+        session = aiohttp.ClientSession()
+
+        def __del__(self):
+            self.session.close()
+
+        async def request(self, method, url, **kwargs):
+            content = ''
+            method = method.upper()
+            if method == 'GET':
+                request = self.session.get
+            elif method == 'POST':
+                request = self.session.post
+            else:
+                raise(TypeError('Unknow method.'))
+
+
+            if kwargs.get('timeout'):
+                timeout = kwargs.pop('timeout')
+                async with async_timeout.timeout(timeout):
+
+                    async with request(url, **kwargs) as response:
+                        content = await response.read()
+            else:
+                async with request(url, **kwargs) as response:
+                    content = await response.read()
+
+
+            if not content:
+                return AioResult(content,
+                    '',
+                    '')
+
+            return AioResult(content, 
+                response.headers, 
+                response.cookies, 
+                encoding=kwargs.get('encoding') or 'utf-8')
+
+        def get(self, url, **kwargs):
+            return self.request('GET', url, **kwargs)
+
+        def post(self, url, **kwargs):
+            return self.request('POST', url, **kwargs)
+
+
+    BaseHttp = AioRequestsBase
+
+
+class AsRequests(BaseHttp):
     """
     An async http requests.
 
@@ -209,28 +302,33 @@ class AsRequests(RequestsBase):
     @asyncio.coroutine
     def _aHttpRequest(self, method, url, kwargs):
         eventLoop = asyncio.get_event_loop()
-        # it is still a thread. check out 'asyncio.base_event' getting more details.
-        # check out this:
-        # https://stackoverflow.com/questions/22190403/how-could-i-use-requests-in-asyncio
-        # getting more explain.
-        future = eventLoop.run_in_executor(None, self._httpRequest, method, url, kwargs)
+
+        if not noAiohttp:
+            future = self._httpRequest(method, url, kwargs)
+        else:
+            # it is still a thread. check out 'asyncio.base_event' getting more details.
+            # check out this:
+            # https://stackoverflow.com/questions/22190403/how-could-i-use-requests-in-asyncio
+            # getting more explain.
+            future = eventLoop.run_in_executor(None, self._httpRequest, method, url, kwargs)
 
         try:
             data = yield from future
         except Exception as e:
             data = ErrorRequest(url=url,
-                                                      text='',
-                                                      content=b'',
-                                                      code='404',
-                                                      error_info=e)
+                                text='',
+                                content=b'',
+                                code='404',
+                                error_info=e)
             self.exceptionHandler(e)
         finally:
+            if self.callbackMode == 1:
+                eventLoop.call_soon_threadsafe(self.callback, data)
             if self.callbackMode == 3:
                 eventLoop.call_soon_threadsafe(self.asyncCallback, data)
             elif self.callbackMode == 2:
                 eventLoop.call_soon_threadsafe(self.blockingCallback, data)
-            else:
-                eventLoop.call_soon_threadsafe(self.callback, data)
+
         return data       
 
     @asyncio.coroutine
@@ -286,3 +384,5 @@ asrequests = AsRequests()
 
 if __name__ == '__main__':
     help(asrequests)
+
+
