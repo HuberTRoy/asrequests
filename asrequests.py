@@ -111,12 +111,11 @@ if not noAiohttp:
             if kwargs.get('timeout'):
                 timeout = kwargs.pop('timeout')
                 async with async_timeout.timeout(timeout):
-
-                    async with request(url, **kwargs) as response:
-                        content = await response.read()
-            else:
-                async with request(url, **kwargs) as response:
+                    response = await request(url, **kwargs)
                     content = await response.read()
+            else:
+                response = await request(url, **kwargs)    
+                content = await response.read()
 
 
             if not content:
@@ -353,6 +352,8 @@ class AsRequests(BaseHttp):
                 self.blockingCallbackTasks.append(asyncio.ensure_future(future))
 
             newLoop.run_until_complete(asyncio.wait(self.blockingCallbackTasks))
+            
+        asyncio.set_event_loop(eventLoop)
 
     def setCallback(self, func):
         self.callback = func
@@ -383,6 +384,15 @@ asrequests = AsRequests()
 
 
 if __name__ == '__main__':
-    help(asrequests)
+    # help(asrequests)
+    with asrequests:
+        for i in ['http://www.baidu.com', 'https://github.com']:
+            asrequests.get(i)
 
+    print(asrequests.result)
+    del asrequests
+    with AsRequests() as e:
+        for i in ['http://www.baidu.com', 'https://github.com']:
+            e.get(i)
 
+    print(e.result)
