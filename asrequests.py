@@ -10,6 +10,7 @@ Simple and effective.
 
 """
 import json
+import logging
 import asyncio
 
 try:
@@ -31,6 +32,9 @@ except ImportError:
 from collections import namedtuple
 
 
+logger = logging.getLogger(__name__)
+
+
 __all__ = (
     'AsRequests'
 )
@@ -46,29 +50,29 @@ ErrorRequest = namedtuple('ErrorRequest',
 
 class AioResult(object):
     
-    def __init__(self, content, headers, cookies, encoding='utf-8'):
+    def __init__(self, content, headers, cookies, code, encoding='utf-8'):
 
         self.content = content
         self.header = headers
         self.cookies = cookies
+        self.code = code
         self.encoding = encoding
 
-        self.text = self.returnText
-        self.json = self.returnJson
+    def __repr__(self):
 
-    def returnText(self):
+        return '<Response [{code}]>'.format(code=self.code)
 
-        try:
-            return self.content.decode(encoding)
-        except:
-            return self.content.decode()
-
-    def returnJson(self):
+    @property
+    def text(self):
 
         try:
-            return json.loads(self.text)
-        except:
-            return 'This contents are not json data.'
+            return str(self.content, self.encoding, errors='replace')
+        except (LookupError, TypeError):
+            return str(self.content, errors='replace')
+
+    @property
+    def json(self):
+        return json.loads(self.text)
 
 
 class RequestsBase(object):
@@ -121,11 +125,13 @@ if not noAiohttp:
             if not content:
                 return AioResult(content,
                     '',
-                    '')
+                    '',
+                    0)
 
             return AioResult(content, 
                 response.headers, 
-                response.cookies, 
+                response.cookies,
+                response.status,
                 encoding=kwargs.get('encoding') or 'utf-8')
 
         def get(self, url, **kwargs):
@@ -258,7 +264,7 @@ class AsRequests(BaseHttp):
         self.asyncCallback = lambda response: self.asyncCallbackTasks.append(self.callback(response))
         
         # default exception handling function.
-        self.exceptionHandler = exceptionHandler if exceptionHandler else lambda exception: print(exception)
+        self.exceptionHandler = exceptionHandler if exceptionHandler else lambda exception: logger.error('Get some error:', exc_info=True)
 
     def __enter__(self):
 
@@ -343,6 +349,7 @@ class AsRequests(BaseHttp):
         eventLoop.run_until_complete(asyncio.wait(self.tasks))
 
         newLoop = asyncio.new_event_loop()
+
         asyncio.set_event_loop(newLoop)
         if self.callbackMode == 3:
             newLoop.run_until_complete(asyncio.wait([asyncio.Task(_) for _ in self.asyncCallbackTasks]))
@@ -384,5 +391,6 @@ asrequests = AsRequests()
 
 
 if __name__ == '__main__':
+
     help(asrequests)
 
