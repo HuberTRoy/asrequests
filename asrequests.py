@@ -29,11 +29,12 @@ except ImportError:
     else:
         noAiohttp = True
 
+import chardet
+
 from collections import namedtuple
 
 
 logger = logging.getLogger(__name__)
-
 
 __all__ = (
     'AsRequests'
@@ -47,10 +48,9 @@ ErrorRequest = namedtuple('ErrorRequest',
                           'error_info'])
 
 
-
 class AioResult(object):
     
-    def __init__(self, content, headers, cookies, code, encoding='utf-8'):
+    def __init__(self, content, headers, cookies, code, encoding=None):
 
         self.content = content
         self.header = headers
@@ -64,9 +64,12 @@ class AioResult(object):
 
     @property
     def text(self):
-
+        if not self.encoding:
+            encoding = chardet.detect(self.content)['encoding']
+            self.encoding = encoding
+            
         try:
-            return str(self.content, self.encoding, errors='replace')
+            return str(self.content, encoding, errors='replace')
         except (LookupError, TypeError):
             return str(self.content, errors='replace')
 
@@ -132,7 +135,7 @@ if not noAiohttp:
                 response.headers, 
                 response.cookies,
                 response.status,
-                encoding=kwargs.get('encoding') or 'utf-8')
+                encoding=kwargs.get('encoding'))
 
         def get(self, url, **kwargs):
             return self.request('GET', url, **kwargs)
@@ -393,4 +396,8 @@ asrequests = AsRequests()
 if __name__ == '__main__':
 
     help(asrequests)
+    with asrequests:
+        asrequests.get('http://www.baidu.com')
+
+    print(asrequests.result[0].text)
 
