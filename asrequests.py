@@ -25,7 +25,7 @@ try:
     noAiohttp = False
 except ImportError:
     if noRequests:
-        print('aiohttp and requests cannot be found.')
+        raise ImportError('aiohttp and requests cannot be found.')
     else:
         noAiohttp = True
 
@@ -37,7 +37,7 @@ from collections import namedtuple
 logger = logging.getLogger(__name__)
 
 __all__ = (
-    'AsRequests'
+    'AsRequests', 'asrequests'
 )
 
 ErrorRequest = namedtuple('ErrorRequest', 
@@ -67,7 +67,9 @@ class AioResult(object):
         if not self.encoding:
             encoding = chardet.detect(self.content)['encoding']
             self.encoding = encoding
-            
+        else:
+            encoding = self.encoding
+
         try:
             return str(self.content, encoding, errors='replace')
         except (LookupError, TypeError):
@@ -396,8 +398,4 @@ asrequests = AsRequests()
 if __name__ == '__main__':
 
     help(asrequests)
-    with asrequests:
-        asrequests.get('http://www.baidu.com')
-
-    print(asrequests.result[0].text)
 
