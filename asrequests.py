@@ -107,7 +107,12 @@ if not noAiohttp:
             self.session.close()
 
         async def request(self, method, url, **kwargs):
-            content = ''
+            cookies = kwargs.get('cookies')
+            if cookies is not None:
+                self.session._cookie_jar.update_cookies(cookies)
+                kwargs.pop('cookies')
+
+            content = b''
             method = method.upper()
             if method == 'GET':
                 request = self.session.get
@@ -115,7 +120,6 @@ if not noAiohttp:
                 request = self.session.post
             else:
                 raise(TypeError('Unknow method.'))
-
 
             if kwargs.get('timeout'):
                 timeout = kwargs.pop('timeout')
@@ -126,16 +130,17 @@ if not noAiohttp:
                 response = await request(url, **kwargs)    
                 content = await response.read()
 
-
             if not content:
-                return AioResult(content,
+                return AioResult(url,
+                    content,
                     '',
                     '',
                     0)
 
-            return AioResult(content, 
+            return AioResult(url,
+                content, 
                 response.headers, 
-                response.cookies,
+                self.session.cookie_jar,
                 response.status,
                 encoding=kwargs.get('encoding'))
 
