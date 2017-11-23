@@ -27,7 +27,25 @@ Send them all the same time.
 [<Response [200]>, ErrorRequest(url='http://nodomain/', text='', ...), <Response [200]>]
 ```
 
-Use callback.
+Using like requests:
+```
+from asrequests import asrequests
+
+async def get_http():
+        for i in urls:
+            response = await asrequests.get(i)
+            print(response)
+
+....
+asyncio.run_until_complete(get_http)
+
+===
+<Response [200]>
+ErrorRequest(url='http://nodomain/', text='', ...)
+<Response [200]>
+```
+
+Use callback:
 
 ```
 >>> def my_callback(result):
@@ -47,4 +65,8 @@ This url 'https://www.python.org/' is connectable.
 
 Installation.
 ============
-Download.
+Installation is easy with pip:
+```
+$ pip install grequests
+✨🍰✨
+```
