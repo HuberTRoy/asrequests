@@ -67,6 +67,6 @@ Installation.
 ============
 Installation is easy with pip:
 ```
-$ pip install grequests
+$ pip install asrequests
 ✨🍰✨
 ```
